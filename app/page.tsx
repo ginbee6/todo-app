@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef } from "react";
 
 type Todo = {
   id: number;
@@ -14,6 +14,8 @@ export default function Home() {
     { id: 2, text: "買い物リストを作る", completed: true },
   ]);
   const [input, setInput] = useState("");
+  const dragIndex = useRef<number | null>(null);
+  const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
 
   const addTodo = () => {
     const trimmed = input.trim();
@@ -33,6 +35,35 @@ export default function Home() {
 
   const deleteTodo = (id: number) => {
     setTodos((prev) => prev.filter((t) => t.id !== id));
+  };
+
+  const handleDragStart = (index: number) => {
+    dragIndex.current = index;
+  };
+
+  const handleDragOver = (e: React.DragEvent, index: number) => {
+    e.preventDefault();
+    setDragOverIndex(index);
+  };
+
+  const handleDrop = (index: number) => {
+    if (dragIndex.current === null || dragIndex.current === index) {
+      setDragOverIndex(null);
+      return;
+    }
+    setTodos((prev) => {
+      const next = [...prev];
+      const [moved] = next.splice(dragIndex.current!, 1);
+      next.splice(index, 0, moved);
+      return next;
+    });
+    dragIndex.current = null;
+    setDragOverIndex(null);
+  };
+
+  const handleDragEnd = () => {
+    dragIndex.current = null;
+    setDragOverIndex(null);
   };
 
   const remaining = todos.filter((t) => !t.completed).length;
@@ -100,12 +131,31 @@ export default function Home() {
               {todos.map((todo, index) => (
                 <li
                   key={todo.id}
-                  className={`flex items-center gap-3 px-4 py-3 group transition-colors hover:bg-slate-50 ${
-                    index !== todos.length - 1
-                      ? "border-b border-slate-100"
-                      : ""
+                  draggable
+                  onDragStart={() => handleDragStart(index)}
+                  onDragOver={(e) => handleDragOver(e, index)}
+                  onDrop={() => handleDrop(index)}
+                  onDragEnd={handleDragEnd}
+                  className={`flex items-center gap-3 px-4 py-3 group transition-colors cursor-grab active:cursor-grabbing ${
+                    index !== todos.length - 1 ? "border-b border-slate-100" : ""
+                  } ${
+                    dragOverIndex === index
+                      ? "bg-slate-50 border-t-2 border-t-emerald-400"
+                      : "hover:bg-slate-50"
                   }`}
                 >
+                  {/* Drag handle */}
+                  <span className="shrink-0 text-slate-200 group-hover:text-slate-300 transition-colors select-none">
+                    <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20">
+                      <circle cx="7" cy="5" r="1.5" />
+                      <circle cx="13" cy="5" r="1.5" />
+                      <circle cx="7" cy="10" r="1.5" />
+                      <circle cx="13" cy="10" r="1.5" />
+                      <circle cx="7" cy="15" r="1.5" />
+                      <circle cx="13" cy="15" r="1.5" />
+                    </svg>
+                  </span>
+
                   {/* Checkbox */}
                   <button
                     onClick={() => toggleTodo(todo.id)}
