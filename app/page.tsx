@@ -42,6 +42,34 @@ export default function Home() {
   const swipeXRef = useRef(0);
   const tabPointerStart = useRef<{ x: number; width: number } | null>(null);
 
+  // タイマー
+  const [timerActive, setTimerActive] = useState(false);
+  const [timerSec, setTimerSec] = useState(180);
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  const startTimer = () => {
+    if (timerRef.current) clearInterval(timerRef.current);
+    setTimerSec(180);
+    setTimerActive(true);
+    timerRef.current = setInterval(() => {
+      setTimerSec((s) => {
+        if (s <= 1) {
+          clearInterval(timerRef.current!);
+          timerRef.current = null;
+          setTimerActive(false);
+          return 0;
+        }
+        return s - 1;
+      });
+    }, 1000);
+  };
+
+  const stopTimer = () => {
+    if (timerRef.current) { clearInterval(timerRef.current); timerRef.current = null; }
+    setTimerActive(false);
+    setTimerSec(180);
+  };
+
   // タスク並び替え用
   const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
   const touchFrom = useRef<number | null>(null);
@@ -54,6 +82,8 @@ export default function Home() {
   const addTodo = () => {
     const trimmed = input.trim();
     if (!trimmed) return;
+    if (trimmed === "タイマー起動") { startTimer(); setInput(""); return; }
+    if (trimmed === "タイマー終了") { stopTimer(); setInput(""); return; }
     setTodos((prev) => [...prev, {
       id: Date.now(), text: trimmed, completed: false,
       tab: activeTab === "すべて" ? (tabs[0] ?? "1") : activeTab,
@@ -182,6 +212,28 @@ export default function Home() {
   return (
     <main className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 flex items-center justify-center p-4">
       <div className="w-full max-w-md">
+
+        {/* タイマー */}
+        {timerActive && (
+          <div className="mb-4 flex items-center justify-center gap-3 bg-white rounded-2xl border border-slate-100 shadow-sm px-5 py-3">
+            <div className="relative w-10 h-10">
+              <svg className="w-10 h-10 -rotate-90" viewBox="0 0 36 36">
+                <circle cx="18" cy="18" r="15.9" fill="none" stroke="#f1f5f9" strokeWidth="3" />
+                <circle
+                  cx="18" cy="18" r="15.9" fill="none"
+                  stroke={timerSec <= 30 ? "#f87171" : "#34d399"}
+                  strokeWidth="3"
+                  strokeDasharray={`${(timerSec / 180) * 100} 100`}
+                  strokeLinecap="round"
+                />
+              </svg>
+            </div>
+            <span className={`text-2xl font-bold tabular-nums tracking-tight ${timerSec <= 30 ? "text-red-400" : "text-slate-700"}`}>
+              {String(Math.floor(timerSec / 60)).padStart(2, "0")}:{String(timerSec % 60).padStart(2, "0")}
+            </span>
+            <button onClick={stopTimer} className="ml-1 text-xs text-slate-300 hover:text-slate-500 transition-colors">✕</button>
+          </div>
+        )}
 
         {/* Header */}
         <div className="mb-6 text-center">
