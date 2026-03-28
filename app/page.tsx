@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useState } from "react";
 
 type Todo = {
   id: number;
@@ -14,7 +14,6 @@ export default function Home() {
     { id: 2, text: "買い物リストを作る", completed: true },
   ]);
   const [input, setInput] = useState("");
-  const dragIndex = useRef<number | null>(null);
   const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
 
   const addTodo = () => {
@@ -37,32 +36,34 @@ export default function Home() {
     setTodos((prev) => prev.filter((t) => t.id !== id));
   };
 
-  const handleDragStart = (index: number) => {
-    dragIndex.current = index;
+  const handleDragStart = (e: React.DragEvent, index: number) => {
+    e.dataTransfer.setData("text/plain", String(index));
+    e.dataTransfer.effectAllowed = "move";
   };
 
   const handleDragOver = (e: React.DragEvent, index: number) => {
     e.preventDefault();
+    e.dataTransfer.dropEffect = "move";
     setDragOverIndex(index);
   };
 
-  const handleDrop = (index: number) => {
-    if (dragIndex.current === null || dragIndex.current === index) {
+  const handleDrop = (e: React.DragEvent, index: number) => {
+    e.preventDefault();
+    const from = Number(e.dataTransfer.getData("text/plain"));
+    if (isNaN(from) || from === index) {
       setDragOverIndex(null);
       return;
     }
     setTodos((prev) => {
       const next = [...prev];
-      const [moved] = next.splice(dragIndex.current!, 1);
+      const [moved] = next.splice(from, 1);
       next.splice(index, 0, moved);
       return next;
     });
-    dragIndex.current = null;
     setDragOverIndex(null);
   };
 
   const handleDragEnd = () => {
-    dragIndex.current = null;
     setDragOverIndex(null);
   };
 
@@ -132,9 +133,9 @@ export default function Home() {
                 <li
                   key={todo.id}
                   draggable
-                  onDragStart={() => handleDragStart(index)}
+                  onDragStart={(e) => handleDragStart(e, index)}
                   onDragOver={(e) => handleDragOver(e, index)}
-                  onDrop={() => handleDrop(index)}
+                  onDrop={(e) => handleDrop(e, index)}
                   onDragEnd={handleDragEnd}
                   className={`flex items-center gap-3 px-4 py-3 group transition-colors cursor-grab active:cursor-grabbing ${
                     index !== todos.length - 1 ? "border-b border-slate-100" : ""
