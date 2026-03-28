@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 
 type Todo = {
   id: number;
@@ -10,12 +10,26 @@ type Todo = {
 };
 
 export default function Home() {
-  const [tabs, setTabs] = useState<string[]>(["1", "2"]);
+  const [tabs, setTabs] = useState<string[]>(() => {
+    if (typeof window === "undefined") return ["1", "2"];
+    try { return JSON.parse(localStorage.getItem("tabs") ?? "") } catch { return ["1", "2"]; }
+  });
   const [activeTab, setActiveTab] = useState<string>("すべて");
-  const [todos, setTodos] = useState<Todo[]>([
-    { id: 1, text: "ご飯を食べる", completed: false, tab: "1" },
-    { id: 2, text: "買い物リストを作る", completed: true, tab: "1" },
-  ]);
+  const [todos, setTodos] = useState<Todo[]>(() => {
+    if (typeof window === "undefined") return [
+      { id: 1, text: "ご飯を食べる", completed: false, tab: "1" },
+      { id: 2, text: "買い物リストを作る", completed: true, tab: "1" },
+    ];
+    try { return JSON.parse(localStorage.getItem("todos") ?? "") } catch {
+      return [
+        { id: 1, text: "ご飯を食べる", completed: false, tab: "1" },
+        { id: 2, text: "買い物リストを作る", completed: true, tab: "1" },
+      ];
+    }
+  });
+
+  useEffect(() => { localStorage.setItem("tabs", JSON.stringify(tabs)); }, [tabs]);
+  useEffect(() => { localStorage.setItem("todos", JSON.stringify(todos)); }, [todos]);
   const [input, setInput] = useState("");
   const [newTabInput, setNewTabInput] = useState("");
   const [addingTab, setAddingTab] = useState(false);
