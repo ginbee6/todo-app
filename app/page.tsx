@@ -19,7 +19,7 @@ const NEONS = [
 
 export default function Home() {
   const [neonIdx, setNeonIdx] = useState(0);
-  const [isNeon, setIsNeon] = useState(true);
+  const [isNeon, setIsNeon] = useState(false);
   const neon = NEONS[neonIdx];
 
   const [tabs, setTabs] = useState<string[]>(() => {
@@ -81,6 +81,7 @@ export default function Home() {
     if (!trimmed) return;
     if (trimmed === "タイマー起動") { startTimer(); setInput(""); return; }
     if (trimmed === "タイマー終了") { stopTimer(); setInput(""); return; }
+    if (trimmed === "ネオンカラーにして") { setIsNeon(true); setInput(""); return; }
     if (trimmed === "カラー変更") { setIsNeon(true); setNeonIdx((i) => (i + 1) % NEONS.length); setInput(""); return; }
     if (trimmed === "ネオンカラーやめる") { setIsNeon(false); setInput(""); return; }
     setTodos((prev) => [...prev, { id: Date.now(), text: trimmed, completed: false, tab: activeTab === "すべて" ? (tabs[0] ?? "1") : activeTab }]);
