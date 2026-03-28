@@ -21,8 +21,10 @@ export default function Home() {
   const [input, setInput] = useState("");
   const [newTabInput, setNewTabInput] = useState("");
   const [addingTab, setAddingTab] = useState(false);
-  const tabClickCount = useRef<Record<string, number>>({});
-  const tabClickTimer = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
+  const [swipingTab, setSwipingTab] = useState<string | null>(null);
+  const [swipeX, setSwipeX] = useState(0);
+  const swipeXRef = useRef(0);
+  const tabPointerStart = useRef<{ x: number; width: number } | null>(null);
   const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
   const touchFrom = useRef<number | null>(null);
   const listRef = useRef<HTMLUListElement>(null);
@@ -66,18 +68,35 @@ export default function Home() {
     if (activeTab === tab) setActiveTab("すべて");
   };
 
-  const handleTabClick = (tab: string) => {
-    if (tab === "すべて") { setActiveTab(tab); return; }
-    tabClickCount.current[tab] = (tabClickCount.current[tab] ?? 0) + 1;
-    clearTimeout(tabClickTimer.current[tab]);
-    tabClickTimer.current[tab] = setTimeout(() => {
-      if (tabClickCount.current[tab] >= 3) {
+  const handleTabPointerDown = (e: React.PointerEvent, tab: string) => {
+    if (tab === "すべて") return;
+    (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+    tabPointerStart.current = { x: e.clientX, width: (e.currentTarget as HTMLElement).offsetWidth };
+    swipeXRef.current = 0;
+    setSwipingTab(tab);
+    setSwipeX(0);
+  };
+
+  const handleTabPointerMove = (e: React.PointerEvent) => {
+    if (!tabPointerStart.current) return;
+    const dx = Math.max(0, e.clientX - tabPointerStart.current.x);
+    swipeXRef.current = dx;
+    setSwipeX(dx);
+  };
+
+  const handleTabPointerUp = (tab: string) => {
+    if (tabPointerStart.current) {
+      const threshold = tabPointerStart.current.width * 0.6;
+      if (swipeXRef.current >= threshold) {
         deleteTab(tab);
       } else {
         setActiveTab(tab);
       }
-      tabClickCount.current[tab] = 0;
-    }, 300);
+    }
+    tabPointerStart.current = null;
+    swipeXRef.current = 0;
+    setSwipingTab(null);
+    setSwipeX(0);
   };
 
   // --- Reorder ---
@@ -161,25 +180,42 @@ export default function Home() {
 
         {/* Tabs */}
         <div className="flex items-center gap-1.5 mb-3 flex-wrap">
-          {["すべて", ...tabs].map((tab) => (
-            <button
-              key={tab}
-              onClick={() => handleTabClick(tab)}
-              title={tab !== "すべて" ? "3回クリックで削除" : undefined}
-              className={`px-3 py-1.5 rounded-full text-xs font-medium transition-all ${
-                activeTab === tab
-                  ? "bg-slate-800 text-white"
-                  : "bg-white text-slate-500 border border-slate-200 hover:border-slate-300"
-              }`}
-            >
-              {tab}
-              {tab !== "すべて" && (
-                <span className={`ml-1 ${activeTab === tab ? "text-slate-300" : "text-slate-400"}`}>
-                  ({todos.filter((t) => t.tab === tab).length})
-                </span>
-              )}
-            </button>
-          ))}
+          {["すべて", ...tabs].map((tab) => {
+            const isSwiping = swipingTab === tab;
+            const progress = isSwiping && tabPointerStart.current
+              ? Math.min(swipeX / (tabPointerStart.current.width * 0.6), 1)
+              : 0;
+            const isDeletable = progress >= 1;
+            return (
+              <button
+                key={tab}
+                onPointerDown={tab !== "すべて" ? (e) => handleTabPointerDown(e, tab) : undefined}
+                onPointerMove={tab !== "すべて" ? handleTabPointerMove : undefined}
+                onPointerUp={tab !== "すべて" ? () => handleTabPointerUp(tab) : undefined}
+                onPointerCancel={tab !== "すべて" ? () => { tabPointerStart.current = null; swipeXRef.current = 0; setSwipingTab(null); setSwipeX(0); } : undefined}
+                onClick={tab === "すべて" ? () => setActiveTab(tab) : undefined}
+                title={tab !== "すべて" ? "右にスワイプで削除" : undefined}
+                style={isSwiping ? { transform: `translateX(${swipeX}px)`, transition: "none" } : {}}
+                className={`relative px-3 py-1.5 rounded-full text-xs font-medium transition-all touch-none overflow-hidden ${
+                  isDeletable
+                    ? "bg-red-400 text-white border-transparent"
+                    : activeTab === tab
+                    ? "bg-slate-800 text-white"
+                    : "bg-white text-slate-500 border border-slate-200 hover:border-slate-300"
+                }`}
+              >
+                {tab}
+                {tab !== "すべて" && (
+                  <span className={`ml-1 ${isDeletable ? "text-red-100" : activeTab === tab ? "text-slate-300" : "text-slate-400"}`}>
+                    ({todos.filter((t) => t.tab === tab).length})
+                  </span>
+                )}
+                {isDeletable && (
+                  <span className="ml-1">🗑</span>
+                )}
+              </button>
+            );
+          })}
 
           {/* タブ追加 */}
           {addingTab ? (
