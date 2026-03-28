@@ -19,6 +19,7 @@ const NEONS = [
 
 export default function Home() {
   const [neonIdx, setNeonIdx] = useState(0);
+  const [isNeon, setIsNeon] = useState(true);
   const neon = NEONS[neonIdx];
 
   const [tabs, setTabs] = useState<string[]>(() => {
@@ -80,7 +81,8 @@ export default function Home() {
     if (!trimmed) return;
     if (trimmed === "タイマー起動") { startTimer(); setInput(""); return; }
     if (trimmed === "タイマー終了") { stopTimer(); setInput(""); return; }
-    if (trimmed === "カラー変更") { setNeonIdx((i) => (i + 1) % NEONS.length); setInput(""); return; }
+    if (trimmed === "カラー変更") { setIsNeon(true); setNeonIdx((i) => (i + 1) % NEONS.length); setInput(""); return; }
+    if (trimmed === "ネオンカラーやめる") { setIsNeon(false); setInput(""); return; }
     setTodos((prev) => [...prev, { id: Date.now(), text: trimmed, completed: false, tab: activeTab === "すべて" ? (tabs[0] ?? "1") : activeTab }]);
     setInput("");
   };
@@ -150,12 +152,22 @@ export default function Home() {
   const completedCount = visibleTodos.filter((t) => t.completed).length;
   const rate = visibleTodos.length === 0 ? 0 : Math.round((completedCount / visibleTodos.length) * 100);
 
-  const c = neon.color;
+  const c     = isNeon ? neon.color : "#1e293b";
+  const cGlow = isNeon ? neon.glow  : "transparent";
+  const bgMain    = isNeon ? `radial-gradient(ellipse at 50% 0%, ${neon.glow} 0%, ${neon.bg} 60%)` : "linear-gradient(135deg, #f8fafc, #f1f5f9)";
+  const cardBg    = isNeon ? "rgba(0,0,0,0.55)" : "#ffffff";
+  const cardBorder= isNeon ? c : "#e2e8f0";
+  const cardShadow= isNeon ? `0 0 30px ${cGlow}, inset 0 0 30px rgba(0,0,0,0.3)` : "0 1px 3px rgba(0,0,0,0.06)";
+  const textMain  = isNeon ? "rgba(255,255,255,0.85)" : "#334155";
+  const textMuted = isNeon ? "rgba(255,255,255,0.4)" : "#94a3b8";
+  const divider   = isNeon ? "1px solid rgba(255,255,255,0.07)" : "1px solid #f1f5f9";
+  const tabActive = isNeon ? { background: c, color: "#000", boxShadow: `0 0 12px ${cGlow}` } : { background: "#1e293b", color: "#fff" };
+  const tabInactive= isNeon ? { background: "rgba(255,255,255,0.05)", color: "rgba(255,255,255,0.5)", border: "1px solid rgba(255,255,255,0.1)" } : { background: "#fff", color: "#64748b", border: "1px solid #e2e8f0" };
 
   return (
     <main
-      className="min-h-screen flex items-center justify-center p-4 transition-colors duration-700"
-      style={{ background: `radial-gradient(ellipse at 50% 0%, ${neon.glow} 0%, ${neon.bg} 60%)` }}
+      className="min-h-screen flex items-center justify-center p-4 transition-all duration-700"
+      style={{ background: bgMain }}
     >
       <style>{`
         @keyframes neon-pulse { 0%,100%{opacity:1} 50%{opacity:.7} }
@@ -167,7 +179,7 @@ export default function Home() {
         {/* タイマー */}
         {timerActive && (
           <div className="mb-4 flex items-center justify-center gap-3 rounded-2xl px-5 py-3 border"
-            style={{ background: "rgba(0,0,0,0.6)", borderColor: c, boxShadow: `0 0 16px ${neon.glow}` }}>
+            style={{ background: cardBg, borderColor: cardBorder, boxShadow: cardShadow }}>
             <div className="w-10 h-10">
               <svg className="w-10 h-10 -rotate-90" viewBox="0 0 36 36">
                 <circle cx="18" cy="18" r="15.9" fill="none" stroke="rgba(255,255,255,0.1)" strokeWidth="3" />
@@ -184,17 +196,17 @@ export default function Home() {
 
         {/* Header */}
         <div className="mb-6 text-center">
-          <h1 className="neon-title text-4xl font-bold tracking-widest" style={{ color: c, textShadow: `0 0 20px ${c}, 0 0 40px ${neon.glow}` }}>ToDo</h1>
-          <p className="mt-1 text-xs" style={{ color: "rgba(255,255,255,0.4)" }}>
+          <h1 className={isNeon ? "neon-title text-4xl font-bold tracking-widest" : "text-3xl font-bold tracking-tight"} style={{ color: c, textShadow: isNeon ? `0 0 20px ${c}, 0 0 40px ${cGlow}` : "none" }}>ToDo</h1>
+          <p className="mt-1 text-xs" style={{ color: textMuted }}>
             残り <span className="font-bold" style={{ color: c }}>{remaining}</span> 件
           </p>
           {visibleTodos.length > 0 && (
             <div className="mt-4 mx-auto w-48">
-              <div className="flex justify-between text-xs mb-1.5" style={{ color: "rgba(255,255,255,0.4)" }}>
+              <div className="flex justify-between text-xs mb-1.5" style={{ color: textMuted }}>
                 <span>達成率</span>
                 <span className="font-bold" style={{ color: c }}>{rate}%</span>
               </div>
-              <div className="h-1.5 rounded-full overflow-hidden" style={{ background: "rgba(255,255,255,0.1)" }}>
+              <div className="h-1.5 rounded-full overflow-hidden" style={{ background: isNeon ? "rgba(255,255,255,0.1)" : "#f1f5f9" }}>
                 <div className="h-full rounded-full transition-all duration-500" style={{ width: `${rate}%`, background: c, boxShadow: `0 0 8px ${c}` }} />
               </div>
             </div>
@@ -206,9 +218,7 @@ export default function Home() {
           <button
             onClick={() => setActiveTab("すべて")}
             className="px-3 py-1.5 rounded-full text-xs font-medium transition-all"
-            style={activeTab === "すべて"
-              ? { background: c, color: "#000", boxShadow: `0 0 12px ${neon.glow}` }
-              : { background: "rgba(255,255,255,0.05)", color: "rgba(255,255,255,0.5)", border: `1px solid rgba(255,255,255,0.1)` }}
+            style={activeTab === "すべて" ? tabActive : tabInactive}
           >すべて</button>
 
           {tabs.map((tab) => {
@@ -238,12 +248,10 @@ export default function Home() {
                   transform: isSwiping ? `translateX(${dx}px)` : undefined,
                   transition: isSwiping ? "none" : undefined,
                   ...(isDeleteReady
-                    ? { background: "#ff2d78", color: "#fff", boxShadow: "0 0 12px rgba(255,45,120,0.6)" }
+                    ? { background: "#ff2d78", color: "#fff", boxShadow: isNeon ? "0 0 12px rgba(255,45,120,0.6)" : "none" }
                     : isRenameReady
-                    ? { background: "#39ff14", color: "#000", boxShadow: "0 0 12px rgba(57,255,20,0.6)" }
-                    : activeTab === tab
-                    ? { background: c, color: "#000", boxShadow: `0 0 12px ${neon.glow}` }
-                    : { background: "rgba(255,255,255,0.05)", color: "rgba(255,255,255,0.5)", border: `1px solid rgba(255,255,255,0.1)` }),
+                    ? { background: "#39ff14", color: "#000", boxShadow: isNeon ? "0 0 12px rgba(57,255,20,0.6)" : "none" }
+                    : activeTab === tab ? tabActive : tabInactive),
                 }}
                 className="px-3 py-1.5 rounded-full text-xs font-medium touch-none select-none"
               >
@@ -273,19 +281,19 @@ export default function Home() {
         </div>
 
         {/* Card */}
-        <div className="rounded-2xl overflow-hidden" style={{ background: "rgba(0,0,0,0.55)", border: `1px solid ${c}`, boxShadow: `0 0 30px ${neon.glow}, inset 0 0 30px rgba(0,0,0,0.3)` }}>
-          <div className="flex items-center gap-2 p-4" style={{ borderBottom: `1px solid rgba(255,255,255,0.07)` }}>
+        <div className="rounded-2xl overflow-hidden" style={{ background: cardBg, border: `1px solid ${cardBorder}`, boxShadow: cardShadow }}>
+          <div className="flex items-center gap-2 p-4" style={{ borderBottom: divider }}>
             <input type="text" value={input} onChange={(e) => setInput(e.target.value)}
               placeholder={activeTab === "すべて" ? `新しいタスクを入力 (→ ${tabs[0] ?? "1"})` : `${activeTab}にタスクを追加...`}
               className="flex-1 text-sm outline-none bg-transparent"
-              style={{ color: "#fff", "::placeholder": { color: "rgba(255,255,255,0.2)" } } as React.CSSProperties} />
+              style={{ color: textMain }} />
             <button onClick={addTodo} disabled={!input.trim()}
               className="w-8 h-8 rounded-full flex items-center justify-center text-lg font-bold leading-none transition-all shrink-0 disabled:opacity-20"
               style={{ background: c, color: "#000", boxShadow: input.trim() ? `0 0 12px ${neon.glow}` : "none" }}>+</button>
           </div>
 
           {visibleTodos.length === 0 ? (
-            <div className="py-16 text-center text-xs" style={{ color: "rgba(255,255,255,0.2)" }}>タスクがありません</div>
+            <div className="py-16 text-center text-xs" style={{ color: textMuted }}>タスクがありません</div>
           ) : (
             <ul ref={listRef}>
               {visibleTodos.map((todo, index) => (
@@ -295,7 +303,7 @@ export default function Home() {
                   onTouchStart={() => handleTouchStart(index)} onTouchMove={handleTouchMove} onTouchEnd={handleTouchEnd}
                   className="flex items-center gap-3 px-4 py-3 group cursor-grab active:cursor-grabbing select-none transition-colors"
                   style={{
-                    borderBottom: index !== visibleTodos.length - 1 ? "1px solid rgba(255,255,255,0.05)" : "none",
+                    borderBottom: index !== visibleTodos.length - 1 ? divider : "none",
                     background: dragOverIndex === index ? `rgba(${c.slice(1).match(/.{2}/g)?.map(x=>parseInt(x,16)).join(",")},0.1)` : "transparent",
                     borderTop: dragOverIndex === index ? `2px solid ${c}` : undefined,
                   }}
@@ -314,7 +322,7 @@ export default function Home() {
                     {todo.completed && <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="#000" strokeWidth={3}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7"/></svg>}
                   </button>
                   <span className="flex-1 text-sm leading-relaxed transition-colors"
-                    style={{ color: todo.completed ? "rgba(255,255,255,0.2)" : "rgba(255,255,255,0.85)", textDecoration: todo.completed ? "line-through" : "none" }}>
+                    style={{ color: todo.completed ? textMuted : textMain, textDecoration: todo.completed ? "line-through" : "none" }}>
                     {todo.text}
                   </span>
                   {activeTab === "すべて" && <span className="text-xs shrink-0" style={{ color: "rgba(255,255,255,0.2)" }}>{todo.tab}</span>}
@@ -329,7 +337,7 @@ export default function Home() {
           )}
 
           {visibleTodos.some((t) => t.completed) && (
-            <div className="px-4 py-3 flex justify-end" style={{ borderTop: "1px solid rgba(255,255,255,0.05)" }}>
+            <div className="px-4 py-3 flex justify-end" style={{ borderTop: divider }}>
               <button onClick={() => { const ids = visibleTodos.filter((t) => t.completed).map((t) => t.id); setTodos((prev) => prev.filter((t) => !ids.includes(t.id))); }}
                 className="text-xs transition-colors" style={{ color: "rgba(255,255,255,0.25)" }}>
                 完了済みをすべて削除
