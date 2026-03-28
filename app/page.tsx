@@ -21,6 +21,8 @@ export default function Home() {
   const [input, setInput] = useState("");
   const [newTabInput, setNewTabInput] = useState("");
   const [addingTab, setAddingTab] = useState(false);
+  const tabClickCount = useRef<Record<string, number>>({});
+  const tabClickTimer = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
   const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
   const touchFrom = useRef<number | null>(null);
   const listRef = useRef<HTMLUListElement>(null);
@@ -62,6 +64,20 @@ export default function Home() {
     setTabs((prev) => prev.filter((t) => t !== tab));
     setTodos((prev) => prev.filter((t) => t.tab !== tab));
     if (activeTab === tab) setActiveTab("すべて");
+  };
+
+  const handleTabClick = (tab: string) => {
+    if (tab === "すべて") { setActiveTab(tab); return; }
+    tabClickCount.current[tab] = (tabClickCount.current[tab] ?? 0) + 1;
+    clearTimeout(tabClickTimer.current[tab]);
+    tabClickTimer.current[tab] = setTimeout(() => {
+      if (tabClickCount.current[tab] >= 3) {
+        deleteTab(tab);
+      } else {
+        setActiveTab(tab);
+      }
+      tabClickCount.current[tab] = 0;
+    }, 300);
   };
 
   // --- Reorder ---
@@ -146,32 +162,23 @@ export default function Home() {
         {/* Tabs */}
         <div className="flex items-center gap-1.5 mb-3 flex-wrap">
           {["すべて", ...tabs].map((tab) => (
-            <div key={tab} className="relative group/tab">
-              <button
-                onClick={() => setActiveTab(tab)}
-                className={`px-3 py-1.5 rounded-full text-xs font-medium transition-all ${
-                  activeTab === tab
-                    ? "bg-slate-800 text-white"
-                    : "bg-white text-slate-500 border border-slate-200 hover:border-slate-300"
-                }`}
-              >
-                {tab}
-                {tab !== "すべて" && (
-                  <span className="ml-1 text-slate-400 group-hover/tab:text-slate-300">
-                    ({todos.filter((t) => t.tab === tab).length})
-                  </span>
-                )}
-              </button>
+            <button
+              key={tab}
+              onClick={() => handleTabClick(tab)}
+              title={tab !== "すべて" ? "3回クリックで削除" : undefined}
+              className={`px-3 py-1.5 rounded-full text-xs font-medium transition-all ${
+                activeTab === tab
+                  ? "bg-slate-800 text-white"
+                  : "bg-white text-slate-500 border border-slate-200 hover:border-slate-300"
+              }`}
+            >
+              {tab}
               {tab !== "すべて" && (
-                <button
-                  onClick={() => deleteTab(tab)}
-                  className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-red-400 text-white text-xs leading-none hidden group-hover/tab:flex items-center justify-center"
-                  aria-label={`${tab}を削除`}
-                >
-                  ×
-                </button>
+                <span className={`ml-1 ${activeTab === tab ? "text-slate-300" : "text-slate-400"}`}>
+                  ({todos.filter((t) => t.tab === tab).length})
+                </span>
               )}
-            </div>
+            </button>
           ))}
 
           {/* タブ追加 */}
