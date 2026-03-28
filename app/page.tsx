@@ -9,22 +9,26 @@ type Todo = {
   tab: string;
 };
 
-const DEFAULT_TABS = ["仕事", "プライベート"];
-
 export default function Home() {
-  const [tabs, setTabs] = useState<string[]>(DEFAULT_TABS);
+  const [tabs, setTabs] = useState<string[]>(["1", "2"]);
   const [activeTab, setActiveTab] = useState<string>("すべて");
   const [todos, setTodos] = useState<Todo[]>([
-    { id: 1, text: "ご飯を食べる", completed: false, tab: "プライベート" },
-    { id: 2, text: "買い物リストを作る", completed: true, tab: "プライベート" },
+    { id: 1, text: "ご飯を食べる", completed: false, tab: "1" },
+    { id: 2, text: "買い物リストを作る", completed: true, tab: "1" },
   ]);
   const [input, setInput] = useState("");
   const [newTabInput, setNewTabInput] = useState("");
   const [addingTab, setAddingTab] = useState(false);
+  const [renamingTab, setRenamingTab] = useState<string | null>(null);
+  const [renameValue, setRenameValue] = useState("");
+
+  // スワイプ用
   const [swipingTab, setSwipingTab] = useState<string | null>(null);
   const [swipeX, setSwipeX] = useState(0);
   const swipeXRef = useRef(0);
   const tabPointerStart = useRef<{ x: number; width: number } | null>(null);
+
+  // タスク並び替え用
   const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
   const touchFrom = useRef<number | null>(null);
   const listRef = useRef<HTMLUListElement>(null);
@@ -36,22 +40,18 @@ export default function Home() {
   const addTodo = () => {
     const trimmed = input.trim();
     if (!trimmed) return;
-    setTodos((prev) => [
-      ...prev,
-      { id: Date.now(), text: trimmed, completed: false, tab: activeTab === "すべて" ? (tabs[0] ?? "未分類") : activeTab },
-    ]);
+    setTodos((prev) => [...prev, {
+      id: Date.now(), text: trimmed, completed: false,
+      tab: activeTab === "すべて" ? (tabs[0] ?? "1") : activeTab,
+    }]);
     setInput("");
   };
 
-  const toggleTodo = (id: number) => {
-    setTodos((prev) =>
-      prev.map((t) => (t.id === id ? { ...t, completed: !t.completed } : t))
-    );
-  };
+  const toggleTodo = (id: number) =>
+    setTodos((prev) => prev.map((t) => t.id === id ? { ...t, completed: !t.completed } : t));
 
-  const deleteTodo = (id: number) => {
+  const deleteTodo = (id: number) =>
     setTodos((prev) => prev.filter((t) => t.id !== id));
-  };
 
   const addTab = () => {
     const name = newTabInput.trim();
@@ -68,8 +68,17 @@ export default function Home() {
     if (activeTab === tab) setActiveTab("すべて");
   };
 
+  const renameTab = (oldName: string, newName: string) => {
+    const trimmed = newName.trim();
+    if (!trimmed || (tabs.includes(trimmed) && trimmed !== oldName)) return;
+    setTabs((prev) => prev.map((t) => t === oldName ? trimmed : t));
+    setTodos((prev) => prev.map((t) => t.tab === oldName ? { ...t, tab: trimmed } : t));
+    if (activeTab === oldName) setActiveTab(trimmed);
+    setRenamingTab(null);
+  };
+
+  // ── タブスワイプ ──
   const handleTabPointerDown = (e: React.PointerEvent, tab: string) => {
-    if (tab === "すべて") return;
     (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
     tabPointerStart.current = { x: e.clientX, width: (e.currentTarget as HTMLElement).offsetWidth };
     swipeXRef.current = 0;
@@ -79,16 +88,21 @@ export default function Home() {
 
   const handleTabPointerMove = (e: React.PointerEvent) => {
     if (!tabPointerStart.current) return;
-    const dx = Math.max(0, e.clientX - tabPointerStart.current.x);
+    const dx = e.clientX - tabPointerStart.current.x; // 正=右、負=左
     swipeXRef.current = dx;
     setSwipeX(dx);
   };
 
   const handleTabPointerUp = (tab: string) => {
     if (tabPointerStart.current) {
-      const threshold = tabPointerStart.current.width * 0.6;
-      if (swipeXRef.current >= threshold) {
+      const w = tabPointerStart.current.width;
+      if (swipeXRef.current >= w * 0.6) {
+        // 右スワイプ → 削除
         deleteTab(tab);
+      } else if (swipeXRef.current <= -w * 0.6) {
+        // 左スワイプ → 名称変更
+        setRenamingTab(tab);
+        setRenameValue(tab);
       } else {
         setActiveTab(tab);
       }
@@ -99,7 +113,14 @@ export default function Home() {
     setSwipeX(0);
   };
 
-  // --- Reorder ---
+  const resetSwipe = () => {
+    tabPointerStart.current = null;
+    swipeXRef.current = 0;
+    setSwipingTab(null);
+    setSwipeX(0);
+  };
+
+  // ── タスク並び替え ──
   const reorder = (from: number, to: number) => {
     setTodos((prev) => {
       const ids = visibleTodos.map((t) => t.id);
@@ -112,15 +133,11 @@ export default function Home() {
     });
   };
 
-  // Mouse drag
   const handleDragStart = (e: React.DragEvent, index: number) => {
     e.dataTransfer.setData("text/plain", String(index));
     e.dataTransfer.effectAllowed = "move";
   };
-  const handleDragOver = (e: React.DragEvent, index: number) => {
-    e.preventDefault();
-    setDragOverIndex(index);
-  };
+  const handleDragOver = (e: React.DragEvent, index: number) => { e.preventDefault(); setDragOverIndex(index); };
   const handleDrop = (e: React.DragEvent, index: number) => {
     e.preventDefault();
     const from = Number(e.dataTransfer.getData("text/plain"));
@@ -129,7 +146,6 @@ export default function Home() {
   };
   const handleDragEnd = () => setDragOverIndex(null);
 
-  // Touch drag
   const getIndexFromTouch = (touch: React.Touch): number | null => {
     const el = document.elementFromPoint(touch.clientX, touch.clientY);
     const li = el?.closest("li");
@@ -137,14 +153,10 @@ export default function Home() {
     return Array.from(listRef.current.children).indexOf(li);
   };
   const handleTouchStart = (index: number) => { touchFrom.current = index; };
-  const handleTouchMove = (e: React.TouchEvent) => {
-    setDragOverIndex(getIndexFromTouch(e.touches[0]));
-  };
+  const handleTouchMove = (e: React.TouchEvent) => { setDragOverIndex(getIndexFromTouch(e.touches[0])); };
   const handleTouchEnd = (e: React.TouchEvent) => {
     const to = getIndexFromTouch(e.changedTouches[0]);
-    if (touchFrom.current !== null && to !== null && touchFrom.current !== to) {
-      reorder(touchFrom.current, to);
-    }
+    if (touchFrom.current !== null && to !== null && touchFrom.current !== to) reorder(touchFrom.current, to);
     touchFrom.current = null;
     setDragOverIndex(null);
   };
@@ -156,6 +168,7 @@ export default function Home() {
   return (
     <main className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 flex items-center justify-center p-4">
       <div className="w-full max-w-md">
+
         {/* Header */}
         <div className="mb-6 text-center">
           <h1 className="text-3xl font-bold text-slate-800 tracking-tight">ToDo</h1>
@@ -169,10 +182,7 @@ export default function Home() {
                 <span className="font-semibold text-slate-600">{rate}%</span>
               </div>
               <div className="h-1.5 bg-slate-100 rounded-full overflow-hidden">
-                <div
-                  className="h-full bg-emerald-400 rounded-full transition-all duration-500"
-                  style={{ width: `${rate}%` }}
-                />
+                <div className="h-full bg-emerald-400 rounded-full transition-all duration-500" style={{ width: `${rate}%` }} />
               </div>
             </div>
           )}
@@ -180,38 +190,68 @@ export default function Home() {
 
         {/* Tabs */}
         <div className="flex items-center gap-1.5 mb-3 flex-wrap">
-          {["すべて", ...tabs].map((tab) => {
+
+          {/* すべて */}
+          <button
+            onClick={() => setActiveTab("すべて")}
+            className={`px-3 py-1.5 rounded-full text-xs font-medium transition-all ${
+              activeTab === "すべて" ? "bg-slate-800 text-white" : "bg-white text-slate-500 border border-slate-200 hover:border-slate-300"
+            }`}
+          >
+            すべて
+          </button>
+
+          {/* カスタムタブ */}
+          {tabs.map((tab) => {
+            if (renamingTab === tab) {
+              return (
+                <div key={tab} className="flex items-center gap-1">
+                  <input
+                    autoFocus
+                    value={renameValue}
+                    onChange={(e) => setRenameValue(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") renameTab(tab, renameValue);
+                      if (e.key === "Escape") setRenamingTab(null);
+                    }}
+                    onBlur={() => renameTab(tab, renameValue)}
+                    className="w-20 px-2 py-1.5 text-xs border border-slate-300 rounded-full outline-none focus:border-emerald-400"
+                  />
+                </div>
+              );
+            }
+
             const isSwiping = swipingTab === tab;
-            const progress = isSwiping && tabPointerStart.current
-              ? Math.min(swipeX / (tabPointerStart.current.width * 0.6), 1)
-              : 0;
-            const isDeletable = progress >= 1;
+            const dx = isSwiping ? swipeX : 0;
+            const w = tabPointerStart.current?.width ?? 1;
+            const rightProgress = Math.min(Math.max(dx, 0) / (w * 0.6), 1);
+            const leftProgress  = Math.min(Math.max(-dx, 0) / (w * 0.6), 1);
+            const isDeleteReady = rightProgress >= 1;
+            const isRenameReady = leftProgress >= 1;
+
             return (
               <button
                 key={tab}
-                onPointerDown={tab !== "すべて" ? (e) => handleTabPointerDown(e, tab) : undefined}
-                onPointerMove={tab !== "すべて" ? handleTabPointerMove : undefined}
-                onPointerUp={tab !== "すべて" ? () => handleTabPointerUp(tab) : undefined}
-                onPointerCancel={tab !== "すべて" ? () => { tabPointerStart.current = null; swipeXRef.current = 0; setSwipingTab(null); setSwipeX(0); } : undefined}
-                onClick={tab === "すべて" ? () => setActiveTab(tab) : undefined}
-                title={tab !== "すべて" ? "右にスワイプで削除" : undefined}
-                style={isSwiping ? { transform: `translateX(${swipeX}px)`, transition: "none" } : {}}
-                className={`relative px-3 py-1.5 rounded-full text-xs font-medium transition-all touch-none overflow-hidden ${
-                  isDeletable
-                    ? "bg-red-400 text-white border-transparent"
+                onPointerDown={(e) => handleTabPointerDown(e, tab)}
+                onPointerMove={handleTabPointerMove}
+                onPointerUp={() => handleTabPointerUp(tab)}
+                onPointerCancel={resetSwipe}
+                style={isSwiping ? { transform: `translateX(${dx}px)`, transition: "none" } : {}}
+                className={`px-3 py-1.5 rounded-full text-xs font-medium touch-none select-none transition-colors ${
+                  isDeleteReady
+                    ? "bg-red-400 text-white"
+                    : isRenameReady
+                    ? "bg-emerald-400 text-white"
                     : activeTab === tab
                     ? "bg-slate-800 text-white"
-                    : "bg-white text-slate-500 border border-slate-200 hover:border-slate-300"
+                    : "bg-white text-slate-500 border border-slate-200"
                 }`}
               >
-                {tab}
-                {tab !== "すべて" && (
-                  <span className={`ml-1 ${isDeletable ? "text-red-100" : activeTab === tab ? "text-slate-300" : "text-slate-400"}`}>
+                {isDeleteReady ? "🗑 削除" : isRenameReady ? "✏️ 名称変更" : tab}
+                {!isDeleteReady && !isRenameReady && (
+                  <span className={`ml-1 ${activeTab === tab ? "text-slate-300" : "text-slate-400"}`}>
                     ({todos.filter((t) => t.tab === tab).length})
                   </span>
-                )}
-                {isDeletable && (
-                  <span className="ml-1">🗑</span>
                 )}
               </button>
             );
@@ -243,13 +283,12 @@ export default function Home() {
 
         {/* Card */}
         <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
-          {/* Input area */}
           <div className="flex items-center gap-2 p-4 border-b border-slate-100">
             <input
               type="text"
               value={input}
               onChange={(e) => setInput(e.target.value)}
-              placeholder={activeTab === "すべて" ? `新しいタスクを入力 (→ ${tabs[0] ?? "未分類"})` : `${activeTab}にタスクを追加...`}
+              placeholder={activeTab === "すべて" ? `新しいタスクを入力 (→ ${tabs[0] ?? "1"})` : `${activeTab}にタスクを追加...`}
               className="flex-1 text-sm text-slate-700 placeholder-slate-300 outline-none bg-transparent"
             />
             <button
@@ -257,16 +296,11 @@ export default function Home() {
               disabled={!input.trim()}
               className="w-8 h-8 rounded-full bg-slate-800 text-white flex items-center justify-center text-lg leading-none disabled:opacity-30 disabled:cursor-not-allowed hover:bg-slate-700 transition-colors shrink-0"
               aria-label="追加"
-            >
-              +
-            </button>
+            >+</button>
           </div>
 
-          {/* Todo list */}
           {visibleTodos.length === 0 ? (
-            <div className="py-16 text-center text-slate-300 text-sm">
-              タスクがありません
-            </div>
+            <div className="py-16 text-center text-slate-300 text-sm">タスクがありません</div>
           ) : (
             <ul ref={listRef}>
               {visibleTodos.map((todo, index) => (
@@ -282,13 +316,8 @@ export default function Home() {
                   onTouchEnd={handleTouchEnd}
                   className={`flex items-center gap-3 px-4 py-3 group transition-colors cursor-grab active:cursor-grabbing select-none ${
                     index !== visibleTodos.length - 1 ? "border-b border-slate-100" : ""
-                  } ${
-                    dragOverIndex === index
-                      ? "bg-emerald-50 border-t-2 border-t-emerald-400"
-                      : "hover:bg-slate-50"
-                  }`}
+                  } ${dragOverIndex === index ? "bg-emerald-50 border-t-2 border-t-emerald-400" : "hover:bg-slate-50"}`}
                 >
-                  {/* Drag handle */}
                   <span className="shrink-0 text-slate-200 group-hover:text-slate-300 transition-colors">
                     <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20">
                       <circle cx="7" cy="5" r="1.5" /><circle cx="13" cy="5" r="1.5" />
@@ -296,8 +325,6 @@ export default function Home() {
                       <circle cx="7" cy="15" r="1.5" /><circle cx="13" cy="15" r="1.5" />
                     </svg>
                   </span>
-
-                  {/* Checkbox */}
                   <button
                     onClick={() => toggleTodo(todo.id)}
                     className={`shrink-0 w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all ${
@@ -311,18 +338,12 @@ export default function Home() {
                       </svg>
                     )}
                   </button>
-
-                  {/* Text */}
                   <span className={`flex-1 text-sm leading-relaxed transition-colors ${todo.completed ? "line-through text-slate-300" : "text-slate-700"}`}>
                     {todo.text}
                   </span>
-
-                  {/* Tab badge (すべてタブのみ表示) */}
                   {activeTab === "すべて" && (
                     <span className="text-xs text-slate-300 shrink-0">{todo.tab}</span>
                   )}
-
-                  {/* Delete */}
                   <button
                     onClick={() => deleteTodo(todo.id)}
                     className="shrink-0 w-6 h-6 rounded-full flex items-center justify-center text-slate-300 hover:text-red-400 hover:bg-red-50 opacity-0 group-hover:opacity-100 transition-all"
@@ -337,7 +358,6 @@ export default function Home() {
             </ul>
           )}
 
-          {/* Footer */}
           {visibleTodos.some((t) => t.completed) && (
             <div className="px-4 py-3 border-t border-slate-100 flex justify-end">
               <button
