@@ -10,7 +10,7 @@ type Todo = {
 
 export default function Home() {
   const [todos, setTodos] = useState<Todo[]>([
-    { id: 1, text: "Next.jsの勉強をする", completed: false },
+    { id: 1, text: "ご飯を食べる", completed: false },
     { id: 2, text: "買い物リストを作る", completed: true },
   ]);
   const [input, setInput] = useState("");
