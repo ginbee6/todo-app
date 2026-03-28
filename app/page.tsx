@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef } from "react";
 
 type Todo = {
   id: number;
@@ -15,14 +15,13 @@ export default function Home() {
   ]);
   const [input, setInput] = useState("");
   const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
+  const touchFrom = useRef<number | null>(null);
+  const listRef = useRef<HTMLUListElement>(null);
 
   const addTodo = () => {
     const trimmed = input.trim();
     if (!trimmed) return;
-    setTodos((prev) => [
-      ...prev,
-      { id: Date.now(), text: trimmed, completed: false },
-    ]);
+    setTodos((prev) => [...prev, { id: Date.now(), text: trimmed, completed: false }]);
     setInput("");
   };
 
@@ -36,6 +35,7 @@ export default function Home() {
     setTodos((prev) => prev.filter((t) => t.id !== id));
   };
 
+  // --- Mouse drag (PC) ---
   const handleDragStart = (e: React.DragEvent, index: number) => {
     e.dataTransfer.setData("text/plain", String(index));
     e.dataTransfer.effectAllowed = "move";
@@ -50,21 +50,45 @@ export default function Home() {
   const handleDrop = (e: React.DragEvent, index: number) => {
     e.preventDefault();
     const from = Number(e.dataTransfer.getData("text/plain"));
-    if (isNaN(from) || from === index) {
-      setDragOverIndex(null);
-      return;
-    }
-    setTodos((prev) => {
-      const next = [...prev];
-      const [moved] = next.splice(from, 1);
-      next.splice(index, 0, moved);
-      return next;
-    });
+    if (!isNaN(from) && from !== index) reorder(from, index);
     setDragOverIndex(null);
   };
 
-  const handleDragEnd = () => {
+  const handleDragEnd = () => setDragOverIndex(null);
+
+  // --- Touch drag (スマホ) ---
+  const getIndexFromTouch = (touch: React.Touch): number | null => {
+    const el = document.elementFromPoint(touch.clientX, touch.clientY);
+    const li = el?.closest("li");
+    if (!li || !listRef.current) return null;
+    return Array.from(listRef.current.children).indexOf(li);
+  };
+
+  const handleTouchStart = (index: number) => {
+    touchFrom.current = index;
+  };
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    const over = getIndexFromTouch(e.touches[0]);
+    setDragOverIndex(over);
+  };
+
+  const handleTouchEnd = (e: React.TouchEvent) => {
+    const to = getIndexFromTouch(e.changedTouches[0]);
+    if (touchFrom.current !== null && to !== null && touchFrom.current !== to) {
+      reorder(touchFrom.current, to);
+    }
+    touchFrom.current = null;
     setDragOverIndex(null);
+  };
+
+  const reorder = (from: number, to: number) => {
+    setTodos((prev) => {
+      const next = [...prev];
+      const [moved] = next.splice(from, 1);
+      next.splice(to, 0, moved);
+      return next;
+    });
   };
 
   const remaining = todos.filter((t) => !t.completed).length;
@@ -76,15 +100,10 @@ export default function Home() {
       <div className="w-full max-w-md">
         {/* Header */}
         <div className="mb-8 text-center">
-          <h1 className="text-3xl font-bold text-slate-800 tracking-tight">
-            ToDo
-          </h1>
+          <h1 className="text-3xl font-bold text-slate-800 tracking-tight">ToDo</h1>
           <p className="mt-1 text-sm text-slate-400">
-            残り{" "}
-            <span className="font-semibold text-slate-600">{remaining}</span>{" "}
-            件
+            残り <span className="font-semibold text-slate-600">{remaining}</span> 件
           </p>
-          {/* Progress */}
           {todos.length > 0 && (
             <div className="mt-4 mx-auto w-48">
               <div className="flex justify-between text-xs text-slate-400 mb-1.5">
@@ -128,7 +147,7 @@ export default function Home() {
               タスクがありません
             </div>
           ) : (
-            <ul>
+            <ul ref={listRef}>
               {todos.map((todo, index) => (
                 <li
                   key={todo.id}
@@ -137,16 +156,19 @@ export default function Home() {
                   onDragOver={(e) => handleDragOver(e, index)}
                   onDrop={(e) => handleDrop(e, index)}
                   onDragEnd={handleDragEnd}
-                  className={`flex items-center gap-3 px-4 py-3 group transition-colors cursor-grab active:cursor-grabbing ${
+                  onTouchStart={() => handleTouchStart(index)}
+                  onTouchMove={handleTouchMove}
+                  onTouchEnd={handleTouchEnd}
+                  className={`flex items-center gap-3 px-4 py-3 group transition-colors cursor-grab active:cursor-grabbing select-none ${
                     index !== todos.length - 1 ? "border-b border-slate-100" : ""
                   } ${
                     dragOverIndex === index
-                      ? "bg-slate-50 border-t-2 border-t-emerald-400"
+                      ? "bg-emerald-50 border-t-2 border-t-emerald-400"
                       : "hover:bg-slate-50"
                   }`}
                 >
                   {/* Drag handle */}
-                  <span className="shrink-0 text-slate-200 group-hover:text-slate-300 transition-colors select-none">
+                  <span className="shrink-0 text-slate-200 group-hover:text-slate-300 transition-colors">
                     <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20">
                       <circle cx="7" cy="5" r="1.5" />
                       <circle cx="13" cy="5" r="1.5" />
@@ -168,18 +190,8 @@ export default function Home() {
                     aria-label={todo.completed ? "未完了に戻す" : "完了にする"}
                   >
                     {todo.completed && (
-                      <svg
-                        className="w-3 h-3 text-white"
-                        fill="none"
-                        viewBox="0 0 24 24"
-                        stroke="currentColor"
-                        strokeWidth={3}
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          d="M5 13l4 4L19 7"
-                        />
+                      <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
                       </svg>
                     )}
                   </button>
@@ -187,9 +199,7 @@ export default function Home() {
                   {/* Text */}
                   <span
                     className={`flex-1 text-sm leading-relaxed transition-colors ${
-                      todo.completed
-                        ? "line-through text-slate-300"
-                        : "text-slate-700"
+                      todo.completed ? "line-through text-slate-300" : "text-slate-700"
                     }`}
                   >
                     {todo.text}
@@ -201,18 +211,8 @@ export default function Home() {
                     className="shrink-0 w-6 h-6 rounded-full flex items-center justify-center text-slate-300 hover:text-red-400 hover:bg-red-50 opacity-0 group-hover:opacity-100 transition-all"
                     aria-label="削除"
                   >
-                    <svg
-                      className="w-3.5 h-3.5"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                      stroke="currentColor"
-                      strokeWidth={2}
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        d="M6 18L18 6M6 6l12 12"
-                      />
+                    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
                     </svg>
                   </button>
                 </li>
