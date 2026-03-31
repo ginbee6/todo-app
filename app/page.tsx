@@ -298,18 +298,26 @@ export default function Home() {
           ) : (
             <ul ref={listRef}>
               {visibleTodos.map((todo, index) => (
-                <li key={todo.id} draggable
-                  onDragStart={(e) => handleDragStart(e, index)} onDragOver={(e) => handleDragOver(e, index)}
-                  onDrop={(e) => handleDrop(e, index)} onDragEnd={handleDragEnd}
-                  onTouchStart={() => handleTouchStart(index)} onTouchMove={handleTouchMove} onTouchEnd={handleTouchEnd}
-                  className="flex items-center gap-3 px-4 py-3 group cursor-grab active:cursor-grabbing select-none transition-colors"
+                <li key={todo.id}
+                  onDragOver={(e) => handleDragOver(e, index)}
+                  onDrop={(e) => handleDrop(e, index)}
+                  className="flex items-center gap-3 px-4 py-3 group transition-colors"
                   style={{
                     borderBottom: index !== visibleTodos.length - 1 ? divider : "none",
                     background: dragOverIndex === index ? `rgba(${c.slice(1).match(/.{2}/g)?.map(x=>parseInt(x,16)).join(",")},0.1)` : "transparent",
                     borderTop: dragOverIndex === index ? `2px solid ${c}` : undefined,
                   }}
                 >
-                  <span className="shrink-0 transition-colors" style={{ color: "rgba(255,255,255,0.15)" }}>
+                  <span
+                    draggable
+                    onDragStart={(e) => handleDragStart(e, index)}
+                    onDragEnd={handleDragEnd}
+                    onTouchStart={() => handleTouchStart(index)}
+                    onTouchMove={handleTouchMove}
+                    onTouchEnd={handleTouchEnd}
+                    className="shrink-0 transition-colors cursor-grab active:cursor-grabbing touch-none select-none"
+                    style={{ color: isNeon ? "rgba(255,255,255,0.15)" : "#cbd5e1" }}
+                  >
                     <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20">
                       <circle cx="7" cy="5" r="1.5"/><circle cx="13" cy="5" r="1.5"/>
                       <circle cx="7" cy="10" r="1.5"/><circle cx="13" cy="10" r="1.5"/>
